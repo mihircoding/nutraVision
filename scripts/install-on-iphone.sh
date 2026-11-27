@@ -59,7 +59,7 @@ cd "$IOS"
 echo "Building (the first build takes a few minutes)..."
 LOG="$(mktemp)"
 if ! xcodebuild build -project NutraVision.xcodeproj -scheme NutraVision -configuration Debug \
-     -destination "id=$UDID" -derivedDataPath "$DD" -allowProvisioningUpdates -quiet 2>&1 | tee "$LOG"; then
+     -destination "id=$UDID" -derivedDataPath "$DD" -allowProvisioningUpdates -allowProvisioningDeviceRegistration -quiet 2>&1 | tee "$LOG"; then
   if grep -q "Program License Agreement" "$LOG"; then
     echo >&2
     echo "Apple needs the account holder to accept the latest Program License Agreement first:" >&2
