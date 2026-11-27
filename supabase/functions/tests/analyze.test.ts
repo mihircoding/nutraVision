@@ -77,6 +77,15 @@ test("errors: claude failure, bad input, wrong method", async () => {
   assert.equal((await call(ok, [], { method: "GET" })).status, 405);
 });
 
+test("an Anthropic API error says which one, so a bad key or empty balance is visible", async () => {
+  // Shape of the SDK's APIError: HTTP status plus the API's error body.
+  const apiError = Object.assign(new Error("401 invalid x-api-key"),
+    { status: 401, error: { type: "error", error: { type: "authentication_error", message: "invalid x-api-key" } } });
+  const res = await call(async () => { throw apiError; }, []);
+  assert.equal(res.status, 502);
+  assert.deepEqual(await res.json(), { error: "AI analysis failed (401 authentication_error)" });
+});
+
 test("scan quota: over the limit or signed out never reaches the model", async () => {
   let called = 0;
   const claude = async () => { called++; return food([]); };

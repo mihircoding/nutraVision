@@ -33,7 +33,15 @@ export async function handleAnalyzeFood(
   }
 
   let food: ClaudeFood;
-  try { food = await deps.callClaude(img, mt); } catch { return json({ error: "AI analysis failed" }, 502); }
+  try { food = await deps.callClaude(img, mt); } catch (e) {
+    // Log and surface the API's status and error type (never the key) so a bad key, an empty balance or an
+    // unsupported parameter shows up in the function logs and in the app instead of a bare "failed".
+    const status = (e as { status?: unknown }).status;
+    const type = (e as { error?: { error?: { type?: unknown } } }).error?.error?.type;
+    console.error("Claude call failed:", status ?? "-", type ?? "-", e instanceof Error ? e.message : String(e));
+    const detail = typeof status === "number" ? ` (${status}${typeof type === "string" ? " " + type : ""})` : "";
+    return json({ error: "AI analysis failed" + detail }, 502);
+  }
   if (!food.is_food) return json({ is_food: false, items: [], totals: ZERO, notes: food.notes });
 
   const items: AnalyzedItem[] = await Promise.all(food.items.map(async (it): Promise<AnalyzedItem> => {
