@@ -6,6 +6,26 @@ import type { ClaudeFood } from "./claude.ts";
 import type { ClaimScan } from "./quota.ts";
 
 export type CallClaude = (imageB64: string, mediaType: string) => Promise<ClaudeFood>;
+
+/** Tries each vision model in order (Claude, then Gemini) and returns the first answer. Each failure is logged;
+ *  if all fail, the last error is thrown so the app shows the most relevant reason. */
+export function firstSuccessful(callers: CallClaude[]): CallClaude {
+  return async (imageB64, mediaType) => {
+    if (callers.length === 0) throw new Error("No AI key configured (set ANTHROPIC_API_KEY or GEMINI_API_KEY)");
+    let last: unknown;
+    for (const [i, call] of callers.entries()) {
+      try {
+        return await call(imageB64, mediaType);
+      } catch (e) {
+        last = e;
+        if (i < callers.length - 1) {
+          console.warn("vision model failed, trying the next one:", e instanceof Error ? e.message : String(e));
+        }
+      }
+    }
+    throw last;
+  };
+}
 export type AnalyzedItem = {
   name: string; grams: number; confidence: "high" | "medium" | "low";
   source: "usda" | "ai_estimate"; source_ref?: string; nutrients: Nutrients;

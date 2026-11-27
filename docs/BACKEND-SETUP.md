@@ -26,7 +26,12 @@ Without them:
 - **Food search and barcodes** fall back to the USDA's shared `DEMO_KEY`, which is limited to about 30
   searches an hour, shared with everyone else on Supabase's servers.
 
-1. **Anthropic** (photo scanning): **console.anthropic.com** > Settings > Billing, add a few dollars of credit.
+**Photo scanning needs one AI key.** Claude is used when its key works; otherwise Gemini:
+- **Gemini, free:** **aistudio.google.com/apikey** > Create API key (Google account, no card). The free tier
+  has daily limits, and Google may use free-tier photos to improve its products.
+- **Anthropic, paid (about 1 cent a scan):** see step 1.
+
+1. **Anthropic** (photo scanning, optional if you use Gemini): **console.anthropic.com** > Settings > Billing, add a few dollars of credit.
    Then **API Keys** > **Create Key**. A scan costs about 1 cent, and each user is capped at a daily number of
    scans (`0005_ai_scan_quota`).
 2. **USDA** (food search, free): **fdc.nal.usda.gov/api-key-signup**. The key arrives by email.
@@ -113,7 +118,8 @@ All use the password `demo1234`.
 
 | Symptom | Fix |
 |---|---|
-| "AI analysis failed" on photo scan | No `ANTHROPIC_API_KEY`, or no Anthropic credit |
+| "AI analysis failed (400 invalid_request_error)" | Anthropic account has no credit: add credit, or add a free `GEMINI_API_KEY` |
+| "AI analysis failed (429 RESOURCE_EXHAUSTED)" | Gemini free-tier limit reached; try later |
 | "Food database unavailable" | The USDA demo key is rate-limited. Add `FDC_API_KEY` |
 | A new doctor "waiting for license verification" | Expected. Verify them with `supabase/admin/verify_doctor.sql` |
 | Function logs | Dashboard > Edge Functions > pick one > Logs |
