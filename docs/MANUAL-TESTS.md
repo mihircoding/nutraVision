@@ -130,8 +130,13 @@ Priority: **P1** = likely to break or would lose data · **P2** = annoying · **
 
 ## G. Glasses Mode (Meta Ray-Ban, real hardware)
 
-- [ ] **G1 (P1) Connect.** More > Glasses > Connect. Approve in the Meta AI app (Developer Mode on). Come back.
-  **Expect:** it shows as connected.
+- [ ] **G1 (P1) Guided setup.** + > Glasses Mode > Meta glasses on a phone where NutraVision isn't approved yet.
+  **Expect:** the 4-step Glasses setup screen, not a "not connected" error. Follow it: Developer Mode in Meta AI
+  (Settings › App Info, tap App version 5 times) > **Open Meta AI to approve** > approve > you're back with step 3
+  ticked > **Allow camera in Meta AI** > Allow always > step 4 ticked > **Start Glasses Mode**.
+- [ ] **G1b (P1) Clear errors.** With the glasses folded or in the case, start Glasses Mode. **Expect:** "Meta AI
+  can't reach your glasses…", with **Glasses setup** and **Try again** buttons. It should never say "not connected"
+  when the real problem is approval.
 - [ ] **G2 (P1) "Scan this".** Start Glasses Mode, look at a plate, and say "scan this". **Expect:** within about
   8 s you hear the food's name, calories and a verdict.
 - [ ] **G3 (P1) "Add it".** Say "add it". **Expect:** it's logged to the meal for the current time, and you

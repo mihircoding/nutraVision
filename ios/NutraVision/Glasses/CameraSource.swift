@@ -19,20 +19,34 @@ protocol CameraSource: AnyObject {
     func capturePhoto() async -> UIImage?
 }
 
-enum CameraSourceError: LocalizedError {
+enum CameraSourceError: LocalizedError, Equatable {
+    /// NutraVision hasn't been approved in Meta AI (Bluetooth pairing alone isn't enough).
+    case glassesNotRegistered
+    /// Approved, but Meta AI can't reach the glasses (in the case, folded, off, or out of range).
     case glassesNotConnected
     case glassesCameraDenied
+    /// The glasses were reached but their camera session didn't start; carries the SDK's reason.
+    case glassesSessionFailed(String)
     case phoneCameraDenied
     case phoneCameraUnavailable
 
     var errorDescription: String? {
         switch self {
-        case .glassesNotConnected: return "Glasses not connected — open Meta AI and connect your glasses."
-        case .glassesCameraDenied: return "Glasses camera access is off — allow it for NutraVision in the Meta AI app."
+        case .glassesNotRegistered:
+            return "NutraVision isn't approved in Meta AI yet. Tap Glasses setup to connect it."
+        case .glassesNotConnected:
+            return "Meta AI can't reach your glasses right now. Take them out of the case, unfold them, check Meta AI shows them as connected, then try again."
+        case .glassesCameraDenied:
+            return "The glasses camera isn't allowed for NutraVision yet. Tap Glasses setup to allow it in Meta AI."
+        case .glassesSessionFailed(let reason):
+            return "Couldn't start the glasses camera (\(reason)). Close other apps using your glasses, then try again."
         case .phoneCameraDenied: return "Camera access is off — allow it for NutraVision in Settings."
         case .phoneCameraUnavailable: return "No camera is available on this device."
         }
     }
+
+    /// Problems the guided Glasses setup fixes.
+    var needsSetup: Bool { self == .glassesNotRegistered || self == .glassesCameraDenied }
 }
 
 /// A payload is new unless it was seen in the last 5 s. Every sighting restarts its 5 s, so each code in view

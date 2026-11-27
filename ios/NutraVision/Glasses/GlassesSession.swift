@@ -40,7 +40,8 @@ final class GlassesSession: CameraSource {
         let ticket = generation
         defer { if ticket == generation { isStarting = false } }  // after stop(), a newer start() may own the flag
         let wearables = Wearables.shared
-        guard wearables.registrationState == .registered else { throw CameraSourceError.glassesNotConnected }
+        // Pairing the glasses with the phone isn't enough: NutraVision itself must be approved in Meta AI.
+        guard wearables.registrationState == .registered else { throw CameraSourceError.glassesNotRegistered }
 
         // The check throws when no glasses are on the link, so an error means "not connected", not "denied".
         var permission = try? await wearables.checkPermissionStatus(.camera)
@@ -52,8 +53,17 @@ final class GlassesSession: CameraSource {
         guard permission != nil else { throw CameraSourceError.glassesNotConnected }
         guard permission == .granted else { throw CameraSourceError.glassesCameraDenied }
 
-        guard let newSession = try? wearables.createSession(deviceSelector: deviceSelector) else {
+        let newSession: DeviceSession
+        do {
+            newSession = try wearables.createSession(deviceSelector: deviceSelector)
+        } catch .notRegistered {
+            throw CameraSourceError.glassesNotRegistered
+        } catch .noEligibleDevice, .dwaUnavailable {
             throw CameraSourceError.glassesNotConnected
+        } catch .datAppOnTheGlassesUpdateRequired {
+            throw CameraSourceError.glassesSessionFailed("Meta AI needs to update the app on your glasses: open Meta AI › App connections")
+        } catch {
+            throw CameraSourceError.glassesSessionFailed(String(describing: error))
         }
         session = newSession
         // Subscribe before start() so no transition is missed.
@@ -64,7 +74,7 @@ final class GlassesSession: CameraSource {
             try newSession.start()
         } catch {
             stop()
-            throw CameraSourceError.glassesNotConnected
+            throw CameraSourceError.glassesSessionFailed(String(describing: error))
         }
 
         // addCamera needs a started session; a failed start ends in .stopped.
@@ -74,9 +84,14 @@ final class GlassesSession: CameraSource {
         }
         guard ticket == generation else { throw CancellationError() }  // stop() already ended newSession
         let config = StreamConfiguration(videoCodec: .raw, resolution: .low, frameRate: 15)
-        guard newSession.state == .started, let newCamera = try? newSession.addCamera(config: config) else {
+        guard newSession.state == .started else {
+            let reason = newSession.state == .stopped ? "the glasses ended the session" : "the glasses didn't respond in 15 s"
             stop()
-            throw CameraSourceError.glassesNotConnected
+            throw CameraSourceError.glassesSessionFailed(reason)
+        }
+        guard let newCamera = try? newSession.addCamera(config: config) else {
+            stop()
+            throw CameraSourceError.glassesSessionFailed("the camera couldn't be added")
         }
         camera = newCamera
 
