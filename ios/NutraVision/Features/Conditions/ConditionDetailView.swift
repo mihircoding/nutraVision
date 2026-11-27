@@ -9,6 +9,9 @@ struct ConditionDetailView: View {
     @State private var error: String?
     @State private var retry: (() -> Void)?
     @State private var started = false
+    /// One id per screen visit, so a retry after a timeout updates the plan it may already have created
+    /// instead of inserting a duplicate.
+    @State private var planId = UUID()
 
     private var inConditions: Bool { app.profile?.conditions.contains(condition.id) ?? false }
 
@@ -41,7 +44,7 @@ struct ConditionDetailView: View {
                 if started { Text("Plan started. It is now your active plan.").foregroundStyle(Theme.accent) }
                 if let error, let retry { InlineError(message: error, retry: retry) }
                 Button("Start this plan") { startPlan() }
-                    .buttonStyle(.borderedProminent).tint(Theme.accent).disabled(busy || app.profile == nil)
+                    .buttonStyle(.borderedProminent).tint(Theme.accent).disabled(busy || started || app.profile == nil)
                 Button(inConditions ? "In my conditions" : "Add to my conditions") { addCondition() }
                     .buttonStyle(.bordered).disabled(busy || inConditions || app.profile == nil)
             }
@@ -85,7 +88,7 @@ struct ConditionDetailView: View {
         for m in meals.indices {
             for i in meals[m].items.indices { meals[m].items[i].id = UUID() }
         }
-        let plan = DietPlanRow(userId: userId, authorId: userId, conditionId: condition.id,
+        let plan = DietPlanRow(id: planId, userId: userId, authorId: userId, conditionId: condition.id,
                                name: "\(condition.name) plan", notes: nil, targets: profile.targets,
                                meals: meals, isActive: true)
         run(retrying: startPlan) {
@@ -96,7 +99,9 @@ struct ConditionDetailView: View {
 
     private func addCondition() {
         guard var profile = app.profile else { return }
-        if !profile.conditions.contains(condition.id) { profile.conditions.append(condition.id) }
+        if !profile.conditions.contains(condition.id) {
+            profile.conditions = ConditionCatalog.toggling(condition.id, in: profile.conditions)
+        }
         let updated = profile
         run(retrying: addCondition) { try await app.saveProfile(updated) }  // targets recompute while automatic
     }

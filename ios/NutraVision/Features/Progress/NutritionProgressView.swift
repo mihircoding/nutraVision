@@ -63,6 +63,8 @@ struct NutritionProgressView: View {
             if appeared { Task { await load() } } else { appeared = true }
         }
         .task(id: "\(mode.rawValue)|\(visibleRange.start.timeIntervalSince1970)") { await load() }
+        // Food logged from the + sheet or Glasses Mode while this tab is showing.
+        .onChange(of: app.logsVersion) { _, _ in if subject == nil { Task { await load() } } }
     }
 
     private var stepper: some View {

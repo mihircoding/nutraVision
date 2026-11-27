@@ -25,3 +25,10 @@ final class DayModel {
         workouts = try await Backend.shared.workouts(userId: userId, from: day.start, to: day.end)
     }
 }
+
+import SwiftUI
+
+extension EnvironmentValues {
+    /// The diary day food is being added to when it isn't today, so verdicts judge against that day's totals.
+    @Entry var logDay: DayModel? = nil
+}

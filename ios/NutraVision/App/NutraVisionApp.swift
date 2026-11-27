@@ -1,3 +1,4 @@
+import Combine
 import MWDATCore
 import SwiftUI
 
@@ -30,6 +31,10 @@ struct NutraVisionApp: App {
                 .task { await app.start() }
                 .onChange(of: scenePhase) { _, phase in
                     if phase == .active { Task { await app.refresh() } }  // also imports from Apple Health
+                }
+                // The app left open past midnight: start the new day instead of adding to yesterday.
+                .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).receive(on: RunLoop.main)) { _ in
+                    Task { await app.refresh() }
                 }
                 .overlay {
                     RegistrationView(viewModel: wearablesVM, app: app)

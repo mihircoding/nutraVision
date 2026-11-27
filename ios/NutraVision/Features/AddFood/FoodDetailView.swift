@@ -13,6 +13,7 @@ struct FoodDetailView: View {
     var onPick: ((FoodItem, Double) -> Void)?
 
     @Environment(AppModel.self) private var app
+    @Environment(\.logDay) private var logDay
     @Environment(\.dismiss) private var dismiss
 
     private enum Unit: Hashable { case labeled, hundredG, grams }
@@ -40,7 +41,7 @@ struct FoodDetailView: View {
         switch unit {
         case .labeled: return servings
         case .hundredG: return servings * 100 / (item.servingGrams ?? 100)
-        case .grams: return (Double(gramsText) ?? 0) / (item.servingGrams ?? 100)
+        case .grams: return (NumberInput.parse(gramsText, in: NumberInput.grams) ?? 0) / (item.servingGrams ?? 100)
         }
     }
 
@@ -85,7 +86,7 @@ struct FoodDetailView: View {
                 NutritionLabel(nutrients: total)
             }
             Section("Fit for you") {
-                VerdictBadge(verdict: app.verdict(name: item.name, item: total))
+                VerdictBadge(verdict: app.verdict(name: item.name, item: total, day: logDay))
             }
             Section {
                 if let error {

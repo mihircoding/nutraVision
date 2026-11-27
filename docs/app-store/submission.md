@@ -5,7 +5,7 @@ Everything App Store Connect asks for that isn't code. Fill in the `[brackets]`.
 ## Before you submit
 
 - [ ] Apple Developer Program membership ($99/year). Use an organization account if you can; Apple prefers one for apps that handle medical data.
-- [ ] In `ios/project.yml`: set your Team ID as `DEVELOPMENT_TEAM`, and set a bundle ID you own (for example `com.[yourcompany].nutravision`).
+- [ ] Set your Team ID and a bundle ID you own (for example `com.[yourcompany].nutravision`) in the git-ignored `ios/Config.local.xcconfig`: `scripts/configure-ios.sh --team <TEAM_ID> --bundle-id <id>`.
 - [ ] Meta: register the app in the Wearables Developer Center and put its ID in `Info.plist › MWDAT › MetaAppID`.
 - [ ] Supabase:
   - Run migrations `0003`, `0004` and `0005`, then redeploy `analyze-food`.

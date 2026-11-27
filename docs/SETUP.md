@@ -17,10 +17,11 @@
    supabase secrets set ANTHROPIC_API_KEY=... FDC_API_KEY=...
    supabase functions deploy food-search analyze-food
    ```
-7. **App config.** Put the project URL and anon key (Project Settings > API) in
-   `ios/NutraVision/App/Config.swift`.
+7. **App config.** Put the project URL, anon key (Project Settings > API) and your signing team in the
+   git-ignored `ios/Config.local.xcconfig`:
+   `scripts/configure-ios.sh --supabase-url https://<ref>.supabase.co --anon-key <key> --team <TEAM_ID> --bundle-id <id>`.
 8. **Generate the Xcode project** (Mac): `brew install xcodegen && cd ios && xcodegen`.
-9. **Signing and Meta.** In Xcode set the signing team. For the demo leave `MetaAppID` empty in
+9. **Signing and Meta.** The signing team comes from `ios/Config.local.xcconfig` (step 7). For the demo leave `MetaAppID` empty in
    `ios/NutraVision/Info.plist` (Developer Mode requires it empty) and enable Developer Mode for the glasses in the
    Meta AI app. Only for a production release: register the app in the Wearables Developer Center
    (wearables.developer.meta.com) and set `MetaAppID` together with `ClientToken` (and `TeamID`).

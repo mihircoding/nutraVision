@@ -231,6 +231,15 @@ final class Backend {
         try await run { try await client.from("workouts").delete().eq("id", value: id).execute() }
     }
 
+    /// Apple Health deletions: removes the rows imported from these Health samples.
+    func deleteHealthWorkouts(userId: UUID, healthkitUuids: [String]) async throws {
+        guard !healthkitUuids.isEmpty else { return }
+        try await run {
+            try await client.from("workouts").delete().eq("user_id", value: userId)
+                .in("healthkit_uuid", values: healthkitUuids).execute()
+        }
+    }
+
     // MARK: Weights
 
     func weights(userId: UUID, from: Date, to: Date) async throws -> [WeightLogRow] {
@@ -238,6 +247,24 @@ final class Backend {
             try await client.from("weight_logs").select().eq("user_id", value: userId)
                 .gte("measured_at", value: from).lt("measured_at", value: to)
                 .order("measured_at").execute().value
+        }
+    }
+
+    /// The most recent weigh-in, if any.
+    func latestWeight(userId: UUID) async throws -> WeightLogRow? {
+        let rows: [WeightLogRow] = try await run {
+            try await client.from("weight_logs").select().eq("user_id", value: userId)
+                .order("measured_at", ascending: false).limit(1).execute().value
+        }
+        return rows.first
+    }
+
+    /// Apple Health deletions: removes the rows imported from these Health samples.
+    func deleteHealthWeights(userId: UUID, healthkitUuids: [String]) async throws {
+        guard !healthkitUuids.isEmpty else { return }
+        try await run {
+            try await client.from("weight_logs").delete().eq("user_id", value: userId)
+                .in("healthkit_uuid", values: healthkitUuids).execute()
         }
     }
 
@@ -343,38 +370,37 @@ final class Backend {
     }
 
     /// Updates the plan if it exists (granted columns only), otherwise inserts it authored by the signed-in user.
-    /// An active plan deactivates the user's other plans first (one active plan per user).
+    /// Making it active goes through `activate_diet_plan`, which swaps the active plan in one transaction, so a
+    /// failure never leaves the user with no active plan (one active plan per user).
     func saveDietPlan(_ plan: DietPlanRow) async throws {
         try await run {
-            if plan.isActive { try await deactivatePlans(userId: plan.userId, except: plan.id) }
-            let edit: [String: AnyJSON] = try [
+            var edit: [String: AnyJSON] = try [
                 "condition_id": plan.conditionId.map(AnyJSON.string) ?? .null,
                 "name": .string(plan.name),
                 "notes": plan.notes.map(AnyJSON.string) ?? .null,
                 "targets": AnyJSON(plan.targets),
                 "meals": AnyJSON(plan.meals),
-                "is_active": .bool(plan.isActive),
             ]
+            if !plan.isActive { edit["is_active"] = .bool(false) }
             let updated: [DietPlanRow] = try await client.from("diet_plans").update(edit)
                 .eq("id", value: plan.id).execute().value
             if updated.isEmpty {
                 var row = plan
                 row.authorId = userId ?? plan.authorId
+                row.isActive = false
                 try await client.from("diet_plans").insert(row).execute()
             }
+            if plan.isActive { try await activateDietPlan(id: plan.id) }
         }
     }
 
-    func activatePlan(id: UUID, userId: UUID) async throws {
-        try await run {
-            try await deactivatePlans(userId: userId, except: id)
-            try await client.from("diet_plans").update(["is_active": true]).eq("id", value: id).execute()
-        }
+    /// Makes this the user's only active plan; a doctor's plan also sets its targets on the profile.
+    func activatePlan(id: UUID) async throws {
+        try await run { try await activateDietPlan(id: id) }
     }
 
-    private func deactivatePlans(userId: UUID, except id: UUID) async throws {
-        try await client.from("diet_plans").update(["is_active": false])
-            .eq("user_id", value: userId).eq("is_active", value: true).neq("id", value: id).execute()
+    private func activateDietPlan(id: UUID) async throws {
+        try await client.rpc("activate_diet_plan", params: ["plan_id": id.uuidString]).execute()
     }
 
     // MARK: Care links (rows are created only by request_patient)

@@ -15,10 +15,15 @@ struct SendRecommendationView: View {
 
     init(patient: ProfileRow) {
         self.patient = patient
-        let primary = ConditionCatalog.condition(id: patient.conditions.first ?? "general")
+        let primary = ConditionCatalog.condition(id: ConditionCatalog.primaryId(patient.conditions))
         _targets = State(initialValue: patient.targets)
+        // Sample plans reuse the same food (and id) across meals; list rows need unique ids.
+        var meals = primary.samplePlan
+        for m in meals.indices {
+            for i in meals[m].items.indices { meals[m].items[i].id = UUID() }
+        }
         _plan = State(initialValue: DietPlanDraft(name: "\(primary.name) plan", conditionId: primary.id, notes: "",
-                                                  targets: patient.targets, meals: primary.samplePlan))
+                                                  targets: patient.targets, meals: meals))
     }
 
     var body: some View {

@@ -4,6 +4,7 @@ import SwiftUI
 /// Scan result for photo, barcode and glasses scans: editable grams per item, live verdict, Add / Skip.
 struct ScanResultCard: View {
     @Environment(AppModel.self) private var app
+    @Environment(\.logDay) private var logDay
     @Binding var items: [AnalyzedItem]
     /// The meal picker's selection, for a caller with its own Add button; otherwise the card keeps it.
     var meal: Binding<Meal>? = nil
@@ -35,7 +36,7 @@ struct ScanResultCard: View {
             }
             Text("P \(Int(total.proteinG.rounded())) g · C \(Int(total.carbsG.rounded())) g · F \(Int(total.fatG.rounded())) g")
                 .font(.footnote).foregroundStyle(.secondary)
-            VerdictBadge(verdict: app.verdict(name: items.map(\.name).joined(separator: ", "), item: total))
+            VerdictBadge(verdict: app.verdict(name: items.map(\.name).joined(separator: ", "), item: total, day: logDay))
             Picker("Meal", selection: selectedMeal) {
                 ForEach(Meal.allCases, id: \.self) { Text($0.title).tag($0) }
             }
@@ -79,7 +80,7 @@ private struct ScanItemRow: View {
             Text("g").foregroundStyle(.secondary)
         }
         .onChange(of: text) { _, newValue in
-            guard let grams = Double(newValue), grams > 0 else { return }
+            guard let grams = NumberInput.parse(newValue, in: NumberInput.grams), grams > 0 else { return }
             item.grams = grams
             item.nutrients = base.grams > 0 ? base.nutrients.scaled(by: grams / base.grams) : base.nutrients
         }

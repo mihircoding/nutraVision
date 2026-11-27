@@ -88,6 +88,26 @@ public enum ConditionCatalog {
     all.first { $0.id == id } ?? all[0]
   }
 
+  /// "No condition" (`general`) only ever stands alone: it is dropped once a real condition is present and
+  /// used when none is. New profiles start as ["general"], so without this a first pick became the
+  /// second entry and never the primary.
+  public static func normalized(_ ids: [String]) -> [String] {
+    var seen = Set<String>()
+    let real = ids.filter { $0 != "general" && seen.insert($0).inserted }
+    return real.isEmpty ? ["general"] : real
+  }
+
+  /// The primary condition: the first real one picked, else `general`.
+  public static func primaryId(_ ids: [String]) -> String { normalized(ids)[0] }
+
+  /// Taps one condition in a multi-select list. Picking "No condition" clears the others.
+  public static func toggling(_ id: String, in ids: [String]) -> [String] {
+    if id == "general" { return ["general"] }
+    var result = normalized(ids).filter { $0 != "general" }
+    if let i = result.firstIndex(of: id) { result.remove(at: i) } else { result.append(id) }
+    return normalized(result)
+  }
+
   private static let diabetesSummary = "Focus on low glycemic index foods. Monitor carbohydrate intake carefully - aim for 45-60 g per meal. Consistent meal timing is critical."
   private static let diabetesRecommend = [
     "Choose low glycemic index foods (GI < 55)",

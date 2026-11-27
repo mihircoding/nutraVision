@@ -77,6 +77,9 @@ final class HealthSync {
                        source: .healthkit, healthkitUuid: w.uuid.uuidString)
         }
         try await Backend.shared.upsertWorkouts(rows)
+        // Workouts deleted in Health (a forgotten Watch session) must leave the diary too.
+        try await Backend.shared.deleteHealthWorkouts(userId: userId,
+                                                      healthkitUuids: result.deletedObjects.map(\.uuid.uuidString))
         saveAnchor(result.newAnchor, key: Self.workoutsAnchorPrefix + userId.uuidString)
     }
 
@@ -90,6 +93,8 @@ final class HealthSync {
                          source: .healthkit, healthkitUuid: s.uuid.uuidString)
         }
         try await Backend.shared.upsertWeights(rows)
+        try await Backend.shared.deleteHealthWeights(userId: userId,
+                                                     healthkitUuids: result.deletedObjects.map(\.uuid.uuidString))
         saveAnchor(result.newAnchor, key: Self.bodyMassAnchorPrefix + userId.uuidString)
     }
 
@@ -174,7 +179,10 @@ final class HealthSync {
         ]
         // The id goes on every sample too, so `remove` finds them whether or not deleting the correlation works.
         let metadata: [String: Any] = [HKMetadataKeyExternalUUID: log.id.uuidString]
-        let samples: [HKSample] = values.filter { $0.2 > 0 }.map { id, unit, value in
+        // HealthKit rejects the whole food entry if one nutrient type wasn't allowed, so skip those types.
+        let samples: [HKSample] = values.filter { id, _, value in
+            value > 0 && store.authorizationStatus(for: HKQuantityType(id)) == .sharingAuthorized
+        }.map { id, unit, value in
             HKQuantitySample(type: HKQuantityType(id), quantity: HKQuantity(unit: unit, doubleValue: value),
                              start: log.loggedAt, end: log.loggedAt, metadata: metadata)
         }

@@ -38,6 +38,12 @@ struct OnboardingView: View {
                 }
                 .navigationTitle("Step \(step + 1) of 3")
                 .keyboardDoneButton()
+                .toolbar {
+                    // Signed up with the wrong email or role: without this the only way out is to finish setup.
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Sign out") { Task { try? await Backend.shared.signOut() } }
+                    }
+                }
                 .onChange(of: draft) { _, _ in draft?.recomputeTargets() }
                 .toolbar {
                     // Otherwise a new account (or someone who signed in to the wrong one) has no way out.

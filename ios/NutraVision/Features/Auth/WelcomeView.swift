@@ -21,6 +21,12 @@ struct WelcomeView: View {
                 }
                 .padding(.top, 8)
                 Spacer()
+                if !Config.isConfigured {
+                    Label("This build has no Supabase project, so sign-in can't work. Set it in ios/Config.local.xcconfig (see docs/BACKEND-SETUP.md).",
+                          systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote).foregroundStyle(.orange)
+                        .padding(12).background(.orange.opacity(0.12), in: .rect(cornerRadius: 12))
+                }
                 NavigationLink("Create account") { SignUpView() }.buttonStyle(.borderedProminent).controlSize(.large)
                 NavigationLink("Sign in") { SignInView() }.controlSize(.large)
             }

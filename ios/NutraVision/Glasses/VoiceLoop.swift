@@ -271,8 +271,8 @@ final class VoiceLoop: NSObject, AVSpeechSynthesizerDelegate {
 
     /// The primary condition's name, or nil for no condition.
     private var primaryConditionName: String? {
-        guard let id = app.profile?.conditions.first else { return nil }
-        let condition = ConditionCatalog.condition(id: id)
+        guard let ids = app.profile?.conditions else { return nil }
+        let condition = ConditionCatalog.condition(id: ConditionCatalog.primaryId(ids))
         return condition.id == "general" ? nil : condition.name
     }
 

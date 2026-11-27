@@ -59,6 +59,8 @@ final class CareTeamModel {
 struct CareTeamView: View {
     @State private var model = CareTeamModel()
     @State private var revoking: CareLinkRow?
+    /// Links with an Accept/Decline in flight: a second tap would fail with "Request not found".
+    @State private var responding: Set<UUID> = []
 
     var body: some View {
         List {
@@ -77,7 +79,9 @@ struct CareTeamView: View {
                             Button("Accept") { respond(link, accept: true) }
                                 .buttonStyle(.borderedProminent).tint(Theme.accent)
                             Button("Decline") { respond(link, accept: false) }.buttonStyle(.bordered)
+                            if responding.contains(link.id) { ProgressView() }
                         }
+                        .disabled(responding.contains(link.id))
                     }
                     .padding(.vertical, 4)
                 }
@@ -144,6 +148,10 @@ struct CareTeamView: View {
     }
 
     private func respond(_ link: CareLinkRow, accept: Bool) {
-        Task { await model.perform { try await Backend.shared.respondCareLink(id: link.id, accept: accept) } }
+        guard responding.insert(link.id).inserted else { return }
+        Task {
+            await model.perform { try await Backend.shared.respondCareLink(id: link.id, accept: accept) }
+            responding.remove(link.id)
+        }
     }
 }

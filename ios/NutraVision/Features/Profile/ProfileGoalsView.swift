@@ -55,11 +55,7 @@ struct ConditionsSection: View {
         Section("Health conditions") {
             ForEach(ConditionCatalog.all) { condition in
                 Button {
-                    if let i = draft.conditions.firstIndex(of: condition.id) {
-                        draft.conditions.remove(at: i)
-                    } else {
-                        draft.conditions.append(condition.id)
-                    }
+                    draft.conditions = ConditionCatalog.toggling(condition.id, in: draft.conditions)
                 } label: {
                     HStack {
                         Image(systemName: condition.icon).foregroundStyle(Theme.accent2).frame(width: 28)
@@ -68,10 +64,10 @@ struct ConditionsSection: View {
                             Text(condition.summary).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        if draft.conditions.first == condition.id {
+                        if ConditionCatalog.primaryId(draft.conditions) == condition.id {
                             Text("Primary").font(.caption.bold()).foregroundStyle(Theme.accent)
                         }
-                        if draft.conditions.contains(condition.id) {
+                        if ConditionCatalog.normalized(draft.conditions).contains(condition.id) {
                             Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent)
                         }
                     }

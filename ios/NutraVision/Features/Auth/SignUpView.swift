@@ -68,9 +68,12 @@ struct SignUpView: View {
         busy = true
         error = nil
         notice = nil
-        if role == .doctor { app.pendingDoctorCredentials = .init(specialty: specialty, license: license) }
+        let email = email.trimmingCharacters(in: .whitespaces)
+        if role == .doctor {
+            app.pendingDoctorCredentials = .init(email: email, specialty: specialty, license: license)
+        }
         do {
-            try await Backend.shared.signUp(email: email.trimmingCharacters(in: .whitespaces), password: password,
+            try await Backend.shared.signUp(email: email, password: password,
                                             fullName: fullName.trimmingCharacters(in: .whitespaces), role: role)
             if Backend.shared.userId == nil {
                 notice = "Check your email to confirm your account, then sign in."

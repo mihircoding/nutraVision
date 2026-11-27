@@ -33,11 +33,7 @@ jobs:
         if: env.SUPABASE_URL != ''
         working-directory: ios
         run: |
-          sed -i '' \
-            -e "s|https://YOUR-PROJECT.supabase.co|$SUPABASE_URL|" \
-            -e "s|YOUR-ANON-KEY|$SUPABASE_ANON_KEY|" \
-            NutraVision/App/Config.swift
-          grep -q "YOUR-" NutraVision/App/Config.swift && { echo "::error::Config.swift still has placeholders"; exit 1; } || true
+          ../scripts/configure-ios.sh --supabase-url "$SUPABASE_URL" --anon-key "$SUPABASE_ANON_KEY" > /dev/null
           echo "DEMO_BACKEND=1" >> "$GITHUB_ENV"
 
       - name: Show Xcode
