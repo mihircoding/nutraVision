@@ -17,12 +17,12 @@ struct QuickAddView: View {
     @State private var saving = false
     @State private var error: String?
 
-    private static func value(_ text: String) -> Double? {
-        let v = Double(text.replacingOccurrences(of: ",", with: "."))
-        return v.flatMap { $0 >= 0 ? $0 : nil }
+    /// Comma or dot decimals; out-of-range values (a 20-digit number would crash the kcal display) are rejected.
+    private static func value(_ text: String, in range: ClosedRange<Double> = NumberInput.grams) -> Double? {
+        NumberInput.parse(text, in: range)
     }
 
-    private var calories: Double? { Self.value(kcal).flatMap { $0 > 0 ? $0 : nil } }
+    private var calories: Double? { Self.value(kcal, in: NumberInput.kcal).flatMap { $0 > 0 ? $0 : nil } }
 
     var body: some View {
         NavigationStack {

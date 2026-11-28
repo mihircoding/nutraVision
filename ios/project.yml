@@ -20,12 +20,15 @@ targets:
       - path: NutraVision
         excludes:
           - Info.plist
+    configFiles:
+      Debug: Config.xcconfig
+      Release: Config.xcconfig
     settings:
       base:
         INFOPLIST_FILE: NutraVision/Info.plist
-        PRODUCT_BUNDLE_IDENTIFIER: com.nutravision.app
+        PRODUCT_BUNDLE_IDENTIFIER: $(NV_BUNDLE_ID)
         CODE_SIGN_ENTITLEMENTS: NutraVision/NutraVision.entitlements
-        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
@@ -44,10 +47,14 @@ targets:
     platform: iOS
     sources:
       - path: NutraVisionUITests
+    configFiles:
+      Debug: Config.xcconfig
+      Release: Config.xcconfig
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_BUNDLE_IDENTIFIER: com.nutravision.app.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: $(NV_BUNDLE_ID).uitests
+        CODE_SIGN_STYLE: Automatic
         TEST_TARGET_NAME: NutraVision
     dependencies:
       - target: NutraVision

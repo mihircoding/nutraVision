@@ -51,7 +51,7 @@ struct AppleHealthView: View {
     private func sync() async throws {
         guard let userId = Backend.shared.userId else { return }
         try await HealthSync.shared.importNew(userId: userId)
-        try? await app.today?.load()
+        try? await app.reloadToday()
         message = "Synced just now."
     }
 }

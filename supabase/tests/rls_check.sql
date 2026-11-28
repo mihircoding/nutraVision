@@ -31,6 +31,9 @@ do $$ begin
 
 select rls_test.as_user('a1000000-0000-4000-8000-000000000002');
 select rls_test.ok((select count(*) from food_logs) = 0, 'stranger sees no logs');
+do $$ begin
+  begin perform activate_diet_plan(gen_random_uuid()); exception when others then return; end;
+  raise exception 'RLS check failed: activated a plan that is not mine'; end $$;
 
 select rls_test.as_user('d1000000-0000-4000-8000-000000000001');
 select rls_test.ok((select count(*) from food_logs) = 0, 'unlinked doctor sees no logs');
@@ -59,7 +62,8 @@ insert into recommendations (doctor_id, patient_id, kind, payload, message) valu
   (auth.uid(), 'a1000000-0000-4000-8000-000000000001', 'targets',
    '{"targets":{"kcal_target":1800,"protein_g":110,"carbs_g":180,"fat_g":60,"sat_fat_g":12,"sodium_mg":1500,"fiber_g":30}}', 'Lower sodium'),
   (auth.uid(), 'a1000000-0000-4000-8000-000000000001', 'diet_plan',
-   '{"diet_plan":{"name":"DASH week 1","condition_id":"hypertension","notes":"","targets":{"kcal_target":1800,"protein_g":110,"carbs_g":180,"fat_g":60,"sat_fat_g":12,"sodium_mg":1500,"fiber_g":30},"meals":[]}}', 'Try this');
+   '{"diet_plan":{"name":"DASH week 1","condition_id":"hypertension","notes":"","targets":{"kcal_target":1700,"protein_g":105,"carbs_g":170,"fat_g":57,"sat_fat_g":11,"sodium_mg":1400,"fiber_g":30},"meals":[]}}', 'Try this'),
+  (auth.uid(), 'a1000000-0000-4000-8000-000000000001', 'note', '{}', 'Pending at revoke');
 
 select rls_test.as_user('a1000000-0000-4000-8000-000000000001');
 select accept_recommendation((select id from recommendations where kind = 'targets'));
@@ -67,6 +71,7 @@ select rls_test.ok((select kcal_target = 1800 and sodium_mg = 1500 and targets_s
 select accept_recommendation((select id from recommendations where kind = 'diet_plan'));
 select rls_test.ok((select count(*) from diet_plans where is_active) = 1, 'one active plan');
 select rls_test.ok((select author_id from diet_plans where is_active) = 'd1000000-0000-4000-8000-000000000001', 'plan authored by doctor');
+select rls_test.ok((select kcal_target = 1700 and sodium_mg = 1400 and targets_source = 'doctor' from profiles where id = auth.uid()), 'plan targets applied');
 update diet_plans set is_active = false where is_active;
 select rls_test.ok((select count(*) from diet_plans where is_active) = 0, 'patient can deactivate doctor plan');
 update diet_plans set is_active = true where user_id = auth.uid();
@@ -77,7 +82,16 @@ do $$ begin
 do $$ begin
   begin perform accept_recommendation((select id from recommendations where kind = 'targets')); exception when others then return; end;
   raise exception 'RLS check failed: accepted twice'; end $$;
+insert into diet_plans (user_id, author_id, name, targets, meals) values (auth.uid(), auth.uid(), 'My own plan', '{"kcal_target":2500}', '[]');
+update profiles set kcal_target = 1750 where id = auth.uid();
+select activate_diet_plan((select id from diet_plans where name = 'My own plan'));
+select rls_test.ok((select name from diet_plans where is_active) = 'My own plan', 'activate switches the active plan');
+select rls_test.ok((select kcal_target from profiles where id = auth.uid()) = 1750, 'own plan leaves targets alone');
+select activate_diet_plan((select id from diet_plans where name = 'DASH week 1'));
+select rls_test.ok((select count(*) from diet_plans where is_active) = 1, 'still one active plan');
+select rls_test.ok((select kcal_target from profiles where id = auth.uid()) = 1700, 'doctor plan applies its targets');
 update care_links set status = 'revoked' where patient_id = auth.uid();
+select rls_test.ok((select status from recommendations where message = 'Pending at revoke') = 'declined', 'revoke declines pending recommendations');
 
 select rls_test.as_user('d1000000-0000-4000-8000-000000000001');
 select rls_test.ok((select count(*) from food_logs) = 0, 'revoked doctor sees nothing');

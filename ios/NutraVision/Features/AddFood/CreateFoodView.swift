@@ -21,8 +21,17 @@ struct CreateFoodView: View {
     @State private var error: String?
     @State private var saving = false
 
+    private var gramFields: [String] { [protein, carbs, fat, satFat, fiber, sugar, servingGrams] }
+
+    /// Every typed number must parse (a "2,5" must not silently become 0).
+    private var numbersValid: Bool {
+        NumberInput.parse(kcal, in: NumberInput.kcal) != nil
+            && gramFields.allSatisfy { NumberInput.isValidOptional($0, in: NumberInput.grams) }
+            && NumberInput.isValidOptional(sodium, in: NumberInput.milligrams)
+    }
+
     private var canSave: Bool {
-        !name.trimmingCharacters(in: .whitespaces).isEmpty && Double(kcal) != nil && !saving
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && numbersValid && !saving
     }
 
     var body: some View {
@@ -45,6 +54,10 @@ struct CreateFoodView: View {
             }
             Section {
                 if let error { Text(error).foregroundStyle(Theme.bad).font(.footnote) }
+                if !kcal.isEmpty && !numbersValid {
+                    Text("Check the numbers: up to 10,000 kcal, 5,000 g and 100,000 mg.")
+                        .foregroundStyle(Theme.bad).font(.footnote)
+                }
                 Button { save() } label: { Text(error == nil ? "Save" : "Retry").frame(maxWidth: .infinity) }
                     .buttonStyle(.borderedProminent).tint(Theme.accent)
                     .disabled(!canSave)
@@ -65,15 +78,18 @@ struct CreateFoodView: View {
 
     private func save() {
         guard let userId = Backend.shared.userId else { return }
-        func num(_ s: String) -> Double { max(Double(s) ?? 0, 0) }
+        func num(_ s: String, _ range: ClosedRange<Double> = NumberInput.grams) -> Double {
+            NumberInput.parse(s, in: range) ?? 0
+        }
         let brandText = brand.trimmingCharacters(in: .whitespaces)
         let desc = servingDesc.trimmingCharacters(in: .whitespaces)
         let food = CustomFoodRow(
             userId: userId, name: name.trimmingCharacters(in: .whitespaces),
             brand: brandText.isEmpty ? nil : brandText, servingDesc: desc.isEmpty ? "1 serving" : desc,
-            servingGrams: Double(servingGrams).flatMap { $0 > 0 ? $0 : nil },
-            perServing: Nutrients(kcal: num(kcal), proteinG: num(protein), carbsG: num(carbs), fatG: num(fat),
-                                  satFatG: num(satFat), sodiumMg: num(sodium), fiberG: num(fiber), sugarG: num(sugar)))
+            servingGrams: NumberInput.parse(servingGrams, in: NumberInput.grams).flatMap { $0 > 0 ? $0 : nil },
+            perServing: Nutrients(kcal: num(kcal, NumberInput.kcal), proteinG: num(protein), carbsG: num(carbs),
+                                  fatG: num(fat), satFatG: num(satFat), sodiumMg: num(sodium, NumberInput.milligrams),
+                                  fiberG: num(fiber), sugarG: num(sugar)))
         saving = true
         error = nil
         Task {

@@ -94,7 +94,7 @@ public enum TargetCalculator {
 
   public static func targets(stats: BodyStats, conditionIds: [String], weeklyRateKg: Double,
                              now: Date = Date()) -> Targets {
-    let ids = conditionIds.isEmpty ? ["general"] : conditionIds
+    let ids = ConditionCatalog.normalized(conditionIds)
     let conds = ids.map { ConditionCatalog.condition(id: $0) }
     let primary = conds[0]
 

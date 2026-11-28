@@ -3,6 +3,7 @@ import SwiftUI
 
 /// The user's diet plans, active first.
 struct DietPlansView: View {
+    @Environment(AppModel.self) private var app
     @State private var plans: [DietPlanRow] = []
     @State private var loading = false
     @State private var error: String?
@@ -67,11 +68,11 @@ struct DietPlansView: View {
     }
 
     private func activate(_ plan: DietPlanRow) {
-        guard let userId = Backend.shared.userId else { return }
         Task {
             do {
-                try await Backend.shared.activatePlan(id: plan.id, userId: userId)
+                try await Backend.shared.activatePlan(id: plan.id)
                 await load()
+                await app.refresh()  // a doctor's plan changes the targets
             } catch {
                 self.error = error.localizedDescription
             }

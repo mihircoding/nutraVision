@@ -19,7 +19,7 @@ struct LogWeightView: View {
     private static let kgPerLb = 0.45359237
 
     private var kg: Double? {
-        guard let v = Double(text.replacingOccurrences(of: ",", with: ".")), v > 0 else { return nil }
+        guard let v = NumberInput.parse(text, in: 1...1_000) else { return nil }  // kg or lb
         return useLb ? v * Self.kgPerLb : v
     }
 
@@ -73,9 +73,8 @@ struct LogWeightView: View {
                 let cal = Calendar.current
                 if !inserted {
                     // Newest = no stored weigh-in on a later day than the one being logged.
-                    let all = try await Backend.shared.weights(userId: userId, from: Date(timeIntervalSince1970: 0),
-                                                               to: Date().addingTimeInterval(86_400))
-                    let isNewest = all.last.map { cal.startOfDay(for: date) >= cal.startOfDay(for: $0.measuredAt) } ?? true
+                    let latest = try await Backend.shared.latestWeight(userId: userId)
+                    let isNewest = latest.map { cal.startOfDay(for: date) >= cal.startOfDay(for: $0.measuredAt) } ?? true
                     let weightRow = WeightLogRow(userId: userId, measuredAt: date, weightKg: kg,
                                                  source: .manual, healthkitUuid: nil)
                     try await Backend.shared.insertWeight(weightRow)

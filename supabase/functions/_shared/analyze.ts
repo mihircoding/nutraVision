@@ -6,6 +6,26 @@ import type { ClaudeFood } from "./claude.ts";
 import type { ClaimScan } from "./quota.ts";
 
 export type CallClaude = (imageB64: string, mediaType: string) => Promise<ClaudeFood>;
+
+/** Tries each vision model in order (Claude, then Gemini) and returns the first answer. Each failure is logged;
+ *  if all fail, the last error is thrown so the app shows the most relevant reason. */
+export function firstSuccessful(callers: CallClaude[]): CallClaude {
+  return async (imageB64, mediaType) => {
+    if (callers.length === 0) throw new Error("No AI key configured (set ANTHROPIC_API_KEY or GEMINI_API_KEY)");
+    let last: unknown;
+    for (const [i, call] of callers.entries()) {
+      try {
+        return await call(imageB64, mediaType);
+      } catch (e) {
+        last = e;
+        if (i < callers.length - 1) {
+          console.warn("vision model failed, trying the next one:", e instanceof Error ? e.message : String(e));
+        }
+      }
+    }
+    throw last;
+  };
+}
 export type AnalyzedItem = {
   name: string; grams: number; confidence: "high" | "medium" | "low";
   source: "usda" | "ai_estimate"; source_ref?: string; nutrients: Nutrients;
@@ -33,7 +53,15 @@ export async function handleAnalyzeFood(
   }
 
   let food: ClaudeFood;
-  try { food = await deps.callClaude(img, mt); } catch { return json({ error: "AI analysis failed" }, 502); }
+  try { food = await deps.callClaude(img, mt); } catch (e) {
+    // Log and surface the API's status and error type (never the key) so a bad key, an empty balance or an
+    // unsupported parameter shows up in the function logs and in the app instead of a bare "failed".
+    const status = (e as { status?: unknown }).status;
+    const type = (e as { error?: { error?: { type?: unknown } } }).error?.error?.type;
+    console.error("Claude call failed:", status ?? "-", type ?? "-", e instanceof Error ? e.message : String(e));
+    const detail = typeof status === "number" ? ` (${status}${typeof type === "string" ? " " + type : ""})` : "";
+    return json({ error: "AI analysis failed" + detail }, 502);
+  }
   if (!food.is_food) return json({ is_food: false, items: [], totals: ZERO, notes: food.notes });
 
   const items: AnalyzedItem[] = await Promise.all(food.items.map(async (it): Promise<AnalyzedItem> => {

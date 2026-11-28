@@ -25,10 +25,9 @@ struct LogExerciseView: View {
         _startedAt = State(initialValue: date)
     }
 
-    private func number(_ s: String) -> Double? { Double(s.replacingOccurrences(of: ",", with: ".")) }
-    private var minutesValue: Double? { number(minutes) }
-    private var kcalValue: Double? { number(kcalText) }
-    private var distanceValue: Double? { number(distance) }
+    private var minutesValue: Double? { NumberInput.parse(minutes, in: NumberInput.minutes) }
+    private var kcalValue: Double? { NumberInput.parse(kcalText, in: NumberInput.kcal) }
+    private var distanceValue: Double? { NumberInput.parse(distance, in: NumberInput.kilometers) }
     private var valid: Bool {
         guard let m = minutesValue, m > 0, let k = kcalValue, k >= 0 else { return false }
         return distance.isEmpty || (distanceValue ?? -1) >= 0

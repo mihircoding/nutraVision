@@ -1,0 +1,14 @@
+// Per-machine build settings: signing team, bundle id and the Supabase project.
+// Don't edit this file. Put your values in Config.local.xcconfig next to it (gitignored),
+// for example by running:  scripts/configure-ios.sh
+//
+// Note: xcconfig treats "//" as the start of a comment, so SUPABASE_HOST is the host only
+// (abcdefghijkl.supabase.co), never a full https:// URL.
+
+NV_BUNDLE_ID = com.nutravision.app
+DEVELOPMENT_TEAM =
+
+SUPABASE_HOST = YOUR-PROJECT.supabase.co
+SUPABASE_ANON_KEY = YOUR-ANON-KEY
+
+#include? "Config.local.xcconfig"

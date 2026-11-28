@@ -18,6 +18,8 @@ final class AppModel {
     var banner: String?
     /// Bumped when a weight is logged so the Dashboard sparkline reloads.
     var weightsVersion = 0
+    /// Bumped whenever today's food or exercise is reloaded, so screens that summarize days (Progress) refresh.
+    var logsVersion = 0
     /// Bumped when a blood pressure or glucose reading is logged or deleted.
     var vitalsVersion = 0
     /// Bumped when a symptom diary entry is logged or deleted.
@@ -35,8 +37,9 @@ final class AppModel {
         }
     }
 
-    struct DoctorCredentials { var specialty: String; var license: String }
-    /// Set by sign-up before the account exists; written to the doctor profile on first load (retried by refresh()).
+    struct DoctorCredentials { var email: String; var specialty: String; var license: String }
+    /// Set by sign-up before the account exists; written to that doctor's profile on first load (retried by
+    /// refresh()). Matched by email so it never lands on another account signed in on the same device.
     var pendingDoctorCredentials: DoctorCredentials?
 
     var targets: Targets { profile?.targets ?? .defaults }
@@ -88,6 +91,7 @@ final class AppModel {
     /// Saves the profile, recomputing targets first while they are automatic.
     func saveProfile(_ profile: ProfileRow) async throws {
         var updated = profile
+        updated.conditions = ConditionCatalog.normalized(updated.conditions)
         if updated.targetsSource == .auto {
             updated.targets = TargetCalculator.targets(stats: updated.bodyStats, conditionIds: updated.conditions,
                                                        weeklyRateKg: updated.weeklyRateKg)
@@ -105,13 +109,26 @@ final class AppModel {
         if profile?.role == .patient, HealthSync.shared.isAuthorized {
             do {
                 try await HealthSync.shared.importNew(userId: userId)
-                try await today?.load()
+                try await reloadToday()
             } catch {
                 #if DEBUG
                 print("Health import skipped: \(error)")
                 #endif
             }
         }
+    }
+
+    /// Starts a new `today` when the date has rolled over (the app stayed open past midnight).
+    func rollOverIfNeeded() {
+        guard let current = today, !Calendar.current.isDateInToday(current.date) else { return }
+        today = DayModel(userId: current.userId, date: Date())
+    }
+
+    /// Reloads today's logs and tells day summaries to refresh.
+    func reloadToday() async throws {
+        rollOverIfNeeded()
+        try await today?.load()
+        logsVersion += 1
     }
 
     /// The profile load in flight, if any. Only one runs at a time and the newest wins: at launch the
@@ -138,7 +155,8 @@ final class AppModel {
             var profile = try await Backend.shared.profile(id: userId)
             startupLog.debug("load: profile arrived after \(Date().timeIntervalSince(started), format: .fixed(precision: 1))s")
             try Task.checkCancellation()  // signed out (or switched user) while fetching
-            if profile.role == .doctor, let creds = pendingDoctorCredentials {
+            if profile.role == .doctor, let creds = pendingDoctorCredentials,
+               creds.email.caseInsensitiveCompare(profile.email) == .orderedSame {
                 profile.specialty = creds.specialty
                 profile.licenseNumber = creds.license
                 try await Backend.shared.updateProfile(profile)
@@ -158,6 +176,7 @@ final class AppModel {
                 today = DayModel(userId: userId, date: Date())
             }
             try await today?.load()
+            logsVersion += 1
         } catch {
             if Task.isCancelled { return }  // superseded: the newer state already applies
             startupLog.error("load failed after \(Date().timeIntervalSince(started), format: .fixed(precision: 1))s: \(String(describing: error), privacy: .public)")

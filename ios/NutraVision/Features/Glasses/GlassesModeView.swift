@@ -16,22 +16,32 @@ enum GlassesSource: String, Identifiable {
 struct GlassesModeView: View {
     let useGlasses: Bool
     @Environment(AppModel.self) private var app
+    @Environment(WearablesViewModel.self) private var wearables
     @Environment(\.dismiss) private var dismiss
     @State private var loop: VoiceLoop?
     @AppStorage(AIConsent.key) private var aiConsent = false
+    /// Decided when the screen opens: glasses that NutraVision isn't approved for go through setup first.
+    @State private var needsSetup: Bool?
 
     var body: some View {
         // Scans go to the analyze-food AI, so ask first; the scanner (and its camera) starts only after.
-        if aiConsent {
-            scanner
-        } else {
+        if !aiConsent {
             AIConsentView(onContinue: { aiConsent = true }, onCancel: { dismiss() })
+        } else if needsSetup ?? (useGlasses && wearables.registrationState != .registered) {
+            NavigationStack {
+                GlassesSetupView(finishTitle: "Start Glasses Mode", onFinish: { needsSetup = false })
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            }
+            .onAppear { if needsSetup == nil { needsSetup = true } }
+        } else {
+            scanner
+                .onAppear { if needsSetup == nil { needsSetup = false } }  // don't flip back to setup mid-session
         }
     }
 
     private var scanner: some View {
         Group {
-            if let loop { GlassesModeScreen(loop: loop) } else { ProgressView() }
+            if let loop { GlassesModeScreen(loop: loop, useGlasses: useGlasses) } else { ProgressView() }
         }
         .task {
             let current: VoiceLoop
@@ -57,6 +67,8 @@ struct GlassesModeView: View {
 
 private struct GlassesModeScreen: View {
     @Bindable var loop: VoiceLoop
+    let useGlasses: Bool
+    @State private var showSetup = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -81,8 +93,24 @@ private struct GlassesModeScreen: View {
                     .font(.title3)
                 if !loop.reply.isEmpty { Text(loop.reply).foregroundStyle(.secondary) }
                 if let error = loop.error { Text(error).font(.footnote).foregroundStyle(Theme.bad) }
+                if useGlasses && !loop.isRunning && loop.error != nil {
+                    HStack {
+                        Button { showSetup = true } label: { Label("Glasses setup", systemImage: "eyeglasses") }
+                            .buttonStyle(.borderedProminent).tint(Theme.accent)
+                        Button("Try again") { Task { await loop.start() } }.buttonStyle(.bordered)
+                    }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .sheet(isPresented: $showSetup) {
+                NavigationStack {
+                    GlassesSetupView(finishTitle: "Back to Glasses Mode", onFinish: {
+                        showSetup = false
+                        Task { await loop.start() }
+                    })
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { showSetup = false } } }
+                }
+            }
 
             if !loop.pending.isEmpty {
                 ScrollView {

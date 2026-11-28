@@ -5,15 +5,13 @@ import { PGlite } from '@electric-sql/pglite';
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 
 const sql = (f) => readFileSync(new URL(f, import.meta.url), 'utf8');
-const MIGRATIONS = ['0002_delete_account', '0003_keep_plans_when_author_deleted', '0004_doctor_verification', '0005_ai_scan_quota', '0006_vitals_fluids_notes', '0007_symptom_logs'];
+const MIGRATIONS = ['0002_delete_account', '0003_keep_plans_when_author_deleted', '0004_doctor_verification', '0005_ai_scan_quota', '0006_vitals_fluids_notes', '0007_symptom_logs', '0008_care_and_plan_fixes'];
 
 test('schema, RLS and functions', async () => {
   const db = new PGlite({ extensions: { pgcrypto } });
   await db.exec(sql('./auth_stub.sql'));
   await db.exec(sql('../migrations/0001_init.sql'));
-  await db.exec(sql('../migrations/0002_delete_account.sql'));
-  await db.exec(sql('../migrations/0003_keep_plans_when_author_deleted.sql'));
-  await db.exec(sql('../migrations/0004_doctor_verification.sql'));
+  for (const m of MIGRATIONS) await db.exec(sql('../migrations/' + m + '.sql'));
   await db.exec(sql('./rls_check.sql'));
 });
 

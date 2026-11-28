@@ -6,5 +6,10 @@
 	<true/>
 	<key>com.apple.developer.healthkit.access</key>
 	<array/>
+	<!-- Meta glasses camera: the phone joins a Wi-Fi network the glasses host (as in Meta's CameraAccess sample). -->
+	<key>com.apple.developer.networking.HotspotConfiguration</key>
+	<true/>
+	<key>com.apple.developer.networking.wifi-info</key>
+	<true/>
 </dict>
 </plist>

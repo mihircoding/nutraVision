@@ -14,6 +14,7 @@ struct PatientDetailView: View {
     @State private var sending = false
     /// The last 30 days as a CSV file, prepared when the screen opens so the share button works at once.
     @State private var export: URL?
+    @State private var sentCount = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,7 +32,7 @@ struct PatientDetailView: View {
             case .bodyLog:
                 PatientBodyList(patient: patient)
             case .plan:
-                PatientPlanHistory(userId: patient.id)
+                PatientPlanHistory(userId: patient.id).id(sentCount)  // reload after sending
             case .notes:
                 ClinicalNotesView(patient: patient)
             }
@@ -50,7 +51,7 @@ struct PatientDetailView: View {
                 }
             }
         }
-        .sheet(isPresented: $sending) { SendRecommendationView(patient: patient) }
+        .sheet(isPresented: $sending, onDismiss: { sentCount += 1 }) { SendRecommendationView(patient: patient) }
         .task { export = try? await DiaryExport.file(for: patient) }  // no button if it fails
     }
 }

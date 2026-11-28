@@ -65,8 +65,11 @@ final class SpeechRecognizer {
         do {
             try beginTask()
         } catch {
-            stop()
-            throw error
+            // Usually transient right at the start (the recognizer warming up, or the glasses' Bluetooth
+            // audio route still coming up with no input format yet). Keep listening and retry every second,
+            // as a failure later in the session does, instead of leaving voice commands off for good.
+            endTask()
+            restart(after: .seconds(1))
         }
     }
 

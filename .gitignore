@@ -8,3 +8,8 @@
 node_modules/
 ios/*.xcodeproj/
 ios/NutraCore/.build/
+
+# Per-machine iOS settings (signing team, Supabase project)
+ios/Config.local.xcconfig
+# Personal notes (project ref, devices) that must not reach the public repo
+docs/*.local.md

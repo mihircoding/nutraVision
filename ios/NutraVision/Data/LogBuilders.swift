@@ -29,11 +29,14 @@ extension AppModel {
     func addLogs(_ rows: [FoodLogRow]) async throws {
         try await Backend.shared.insertFoodLogs(rows)
         for row in rows { await HealthSync.shared.save(row) }  // best-effort, never throws
-        try? await today?.load()
+        try? await reloadToday()
     }
 
-    func verdict(name: String, item: Nutrients) -> Verdict {
-        HealthVerdict.evaluate(name: name, item: item, targets: targets, dailyGoalKcal: dailyGoalKcal,
-                               consumed: today?.consumed ?? .zero, conditionIds: profile?.conditions ?? [])
+    /// Judges a food against the day it is being added to: `day` when logging into a past or future diary
+    /// day, otherwise today.
+    func verdict(name: String, item: Nutrients, day: DayModel? = nil) -> Verdict {
+        let target = day ?? today
+        return HealthVerdict.evaluate(name: name, item: item, targets: targets, dailyGoalKcal: goalKcal(for: target),
+                                      consumed: target?.consumed ?? .zero, conditionIds: profile?.conditions ?? [])
     }
 }

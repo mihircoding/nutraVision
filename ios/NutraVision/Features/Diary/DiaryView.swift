@@ -34,7 +34,8 @@ struct DiaryView: View {
 
     /// Today's shared model when it is the signed-in user's today, so edits elsewhere show here too.
     private var day: DayModel {
-        if let t = app.today, t.userId == userId, Calendar.current.isDateInToday(date) { return t }
+        if let t = app.today, t.userId == userId, Calendar.current.isDateInToday(date),
+           Calendar.current.isDate(t.date, inSameDayAs: date) { return t }
         return own
     }
 
@@ -89,6 +90,7 @@ struct DiaryView: View {
         .refreshable { await reload() }
         .sheet(item: $addTarget, onDismiss: { Task { await reload() } }) { target in
             AddFoodView(meal: target.meal, date: date)
+                .environment(\.logDay, Calendar.current.isDateInToday(date) ? nil : day)
         }
         .sheet(isPresented: $showExercise) {
             LogExerciseView(date: date) { await reload() }
@@ -320,6 +322,8 @@ private struct EditLogSheet: View {
             defer { saving = false }
             do {
                 try await Backend.shared.updateFoodLog(updated)
+                await HealthSync.shared.remove(updated.id)  // Health has no update: replace the entry
+                await HealthSync.shared.save(updated)
                 await onSaved()
                 if row.userId == Backend.shared.userId { await app.refresh() }
                 dismiss()

@@ -12,7 +12,10 @@ struct RegistrationView: View {
     let app: AppModel
 
     var body: some View {
-        EmptyView()
+        // A real (invisible, untouchable) view: handlers on EmptyView aren't guaranteed to be installed.
+        Color.clear
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
             .onOpenURL { url in
                 if Backend.isPasswordResetLink(url) {
                     Task { await app.openPasswordResetLink(url) }
@@ -24,11 +27,19 @@ struct RegistrationView: View {
                 else { return }
                 Task {
                     do {
-                        _ = try await Wearables.shared.handleUrl(url)
-                    } catch let error as RegistrationError {
-                        viewModel.presentError(error.description)
+                        // Finishes an approval NutraVision started. One started from inside Meta AI (the user
+                        // picked NutraVision there) arrives as a request; going ahead is what they asked for.
+                        _ = try await Wearables.shared.handleUrl(url) { request in
+                            Task {
+                                do { try await request.continueRegistration() } catch {
+                                    await MainActor.run {
+                                        viewModel.presentError("Couldn't finish connecting to Meta AI (\(String(describing: error))). Try Glasses setup again.")
+                                    }
+                                }
+                            }
+                        }
                     } catch {
-                        viewModel.presentError(error.localizedDescription)
+                        viewModel.presentError("Meta AI's reply couldn't be read (\(String(describing: error))). Try Glasses setup again.")
                     }
                 }
             }

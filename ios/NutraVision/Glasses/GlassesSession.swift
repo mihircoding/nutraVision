@@ -1,5 +1,5 @@
 //
-// Meta glasses camera on DAT SDK 1.0: live frames, Vision food-barcode detection, and photo capture that
+// Meta glasses camera on DAT SDK 1.1: live frames, Vision food-barcode detection, and photo capture that
 // falls back to the latest frame after 3 s. SDK calls mirror Meta's CameraAccess sample (CameraViewModel.swift).
 //
 
@@ -14,8 +14,9 @@ import Vision
 final class GlassesSession: CameraSource {
     private(set) var latestFrame: UIImage? = nil
     var onBarcode: ((String) -> Void)? = nil
-    /// Called once when the session or stream stops after `start()` succeeded (glasses folded, off or out of range).
-    var onDisconnect: (() -> Void)? = nil
+    /// Called once when the session or stream stops after `start()` succeeded (glasses folded, off or out of range),
+    /// with the SDK's reason when it gave one (see `GlassesErrorText`).
+    var onDisconnect: ((String?) -> Void)? = nil
 
     // Made up front: AutoDeviceSelector fills in from devicesStream() asynchronously, so one created
     // right before createSession can still be empty (Meta AGENTS.md; the CameraAccess sample does the same).
@@ -28,6 +29,8 @@ final class GlassesSession: CameraSource {
     /// Bumped by stop(); a start() that sees it change after an await has been cancelled.
     private var generation = 0
     private var streamWasUp = false
+    /// The last session or stream error the SDK reported, in words; explains a stop it doesn't otherwise explain.
+    private var lastError: String? = nil
     private var visionBusy = false
     private var lastVisionAt = Date.distantPast
     private var barcodes = BarcodeDebounce()
@@ -40,7 +43,8 @@ final class GlassesSession: CameraSource {
         let ticket = generation
         defer { if ticket == generation { isStarting = false } }  // after stop(), a newer start() may own the flag
         let wearables = Wearables.shared
-        guard wearables.registrationState == .registered else { throw CameraSourceError.glassesNotConnected }
+        // Pairing the glasses with the phone isn't enough: NutraVision itself must be approved in Meta AI.
+        guard wearables.registrationState == .registered else { throw CameraSourceError.glassesNotRegistered }
 
         // The check throws when no glasses are on the link, so an error means "not connected", not "denied".
         var permission = try? await wearables.checkPermissionStatus(.camera)
@@ -52,19 +56,33 @@ final class GlassesSession: CameraSource {
         guard permission != nil else { throw CameraSourceError.glassesNotConnected }
         guard permission == .granted else { throw CameraSourceError.glassesCameraDenied }
 
-        guard let newSession = try? wearables.createSession(deviceSelector: deviceSelector) else {
+        let newSession: DeviceSession
+        do {
+            newSession = try wearables.createSession(deviceSelector: deviceSelector)
+        } catch .notRegistered {
+            throw CameraSourceError.glassesNotRegistered
+        } catch .noEligibleDevice, .dwaUnavailable {
             throw CameraSourceError.glassesNotConnected
+        } catch .datAppOnTheGlassesUpdateRequired {
+            throw CameraSourceError.glassesSessionFailed(GlassesErrorText.reason(.datAppOnTheGlassesUpdateRequired))
+        } catch {
+            throw CameraSourceError.glassesSessionFailed(String(describing: error))
         }
         session = newSession
-        // Subscribe before start() so no transition is missed.
+        lastError = nil
+        // Subscribe before start() so no transition is missed. The errors explain a stop that the state alone doesn't.
         newSession.statePublisher.listen { [weak self] state in
             Task { @MainActor in self?.sessionStateChanged(state) }
+        }.store(in: tokens)
+        newSession.errorPublisher.listen { [weak self] error in
+            guard error != .dwaOutOfStuRange else { return }  // a nonblocking compatibility warning, not a failure
+            Task { @MainActor in self?.lastError = GlassesErrorText.reason(error) }
         }.store(in: tokens)
         do {
             try newSession.start()
         } catch {
             stop()
-            throw CameraSourceError.glassesNotConnected
+            throw CameraSourceError.glassesSessionFailed(String(describing: error))
         }
 
         // addCamera needs a started session; a failed start ends in .stopped.
@@ -74,9 +92,16 @@ final class GlassesSession: CameraSource {
         }
         guard ticket == generation else { throw CancellationError() }  // stop() already ended newSession
         let config = StreamConfiguration(videoCodec: .raw, resolution: .low, frameRate: 15)
-        guard newSession.state == .started, let newCamera = try? newSession.addCamera(config: config) else {
+        guard newSession.state == .started else {
+            let reason = lastError ?? (newSession.state == .stopped
+                ? "the glasses ended the session. Close other apps using your glasses, then try again."
+                : "the glasses didn't respond in 15 seconds. Try again.")
             stop()
-            throw CameraSourceError.glassesNotConnected
+            throw CameraSourceError.glassesSessionFailed(reason)
+        }
+        guard let newCamera = try? newSession.addCamera(config: config) else {
+            stop()
+            throw CameraSourceError.glassesSessionFailed("the camera couldn't be added. Try again.")
         }
         camera = newCamera
 
@@ -93,8 +118,11 @@ final class GlassesSession: CameraSource {
             Task { @MainActor in self?.finishCapture(image ?? self?.latestFrame) }
         }.store(in: tokens)
         stream.errorPublisher.listen { [weak self] error in
-            guard case .photoCaptureFailed = error else { return }  // other errors end in a .stopped state
-            Task { @MainActor in self?.finishCapture(self?.latestFrame) }
+            if case .photoCaptureFailed = error {
+                Task { @MainActor in self?.finishCapture(self?.latestFrame) }
+            } else {  // the stream stops next; keep why for onDisconnect
+                Task { @MainActor in self?.lastError = GlassesErrorText.reason(error) }
+            }
         }.store(in: tokens)
         stream.start()
         isLive = true
@@ -153,8 +181,9 @@ final class GlassesSession: CameraSource {
 
     private func disconnected() {
         guard isLive else { return }  // failures during start() are thrown, not reported here
+        let reason = lastError
         stop()
-        onDisconnect?()
+        onDisconnect?(reason)
     }
 
     private func frameArrived(_ image: UIImage) {
@@ -174,6 +203,47 @@ final class GlassesSession: CameraSource {
         visionBusy = false
         guard isLive, let payload, barcodes.isNew(payload) else { return }
         onBarcode?(payload)
+    }
+}
+
+/// The SDK's session and stream errors as a reason plus what to do, for "Couldn't start the glasses camera: …".
+enum GlassesErrorText {
+    static func reason(_ error: DeviceSessionError) -> String {
+        switch error {
+        case .noEligibleDevice, .dwaUnavailable:
+            return "Meta AI can't reach your glasses. Unfold them and check Meta AI shows them as connected, then try again."
+        case .notRegistered:
+            return "NutraVision isn't approved in Meta AI. Tap Glasses setup."
+        case .thermalCritical, .thermalEmergency:
+            return "your glasses are too hot. Let them cool down, then try again."
+        case .batteryCritical, .peakPowerShutdown:
+            return "your glasses' battery is too low. Charge them, then try again."
+        case .datAppOnTheGlassesUpdateRequired:
+            return "Meta AI needs to update the app on your glasses. Open Meta AI, install the update, then try again."
+        case .insufficientSDKVersion:
+            return "this version of NutraVision is too old for your glasses' software. Update NutraVision."
+        default:
+            return String(describing: error)
+        }
+    }
+
+    static func reason(_ error: StreamError) -> String {
+        switch error {
+        case .deviceNotConnected:
+            return "your iPhone couldn't join the glasses' Wi-Fi. Turn on Local Network for NutraVision in Settings › Privacy & Security › Local Network, tap Join if iOS asks to join the glasses' network, then try again."
+        case .permissionDenied:
+            return "the glasses camera isn't allowed for NutraVision. Tap Glasses setup."
+        case .hingesClosed:
+            return "your glasses are folded. Unfold them, then try again."
+        case .thermalHot:
+            return "your glasses are too hot. Let them cool down, then try again."
+        case .batteryLow, .peakPowerLimit:
+            return "your glasses' battery is too low. Charge them, then try again."
+        case .timeout:
+            return "the glasses didn't respond. Try again."
+        default:
+            return String(describing: error)
+        }
     }
 }
 

@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 import UIKit
 import Vision
@@ -7,14 +8,28 @@ import VisionKit
 struct BarcodeScanSheet: View {
     let onCode: (String) -> Void
     @Environment(\.dismiss) private var dismiss
+    /// `DataScannerViewController.isAvailable` stays false until camera access is granted, and nothing else
+    /// on this path asks for it, so the sheet asks itself.
+    @State private var cameraAccess = AVCaptureDevice.authorizationStatus(for: .video)
 
     var body: some View {
         NavigationStack {
             Group {
                 if !DataScannerViewController.isSupported {
                     message("Barcode scanning isn't supported on this device")
-                } else if !DataScannerViewController.isAvailable {
-                    message("Camera access is needed to scan barcodes. Allow it in Settings.")
+                } else if cameraAccess == .notDetermined {
+                    ProgressView()
+                        .task {
+                            _ = await AVCaptureDevice.requestAccess(for: .video)
+                            cameraAccess = AVCaptureDevice.authorizationStatus(for: .video)
+                        }
+                } else if cameraAccess != .authorized || !DataScannerViewController.isAvailable {
+                    VStack(spacing: 12) {
+                        message("Camera access is needed to scan barcodes.")
+                        if cameraAccess == .denied, let url = URL(string: UIApplication.openSettingsURLString) {
+                            Button("Open Settings") { UIApplication.shared.open(url) }.buttonStyle(.borderedProminent)
+                        }
+                    }
                 } else {
                     ScannerView { code in
                         onCode(code)
