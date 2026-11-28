@@ -42,19 +42,26 @@
 		</dict>
 	</array>
 
-	<key>UISupportedExternalAccessoryProtocols</key>
-	<array>
-		<string>com.meta.ar.wearable</string>
-	</array>
-
+	<!-- Meta glasses (DAT SDK): the session is set up over Bluetooth LE (bluetooth-central) and the camera streams
+	     over a Wi-Fi network the glasses host (Local Network + Bonjour here, Hotspot Configuration in the
+	     entitlements). Without these the glasses end the session right after it starts. No external-accessory /
+	     com.meta.ar.wearable: that's the optional Bluetooth Classic path, which App Review ties to MFi. -->
 	<key>UIBackgroundModes</key>
 	<array>
+		<string>bluetooth-central</string>
 		<string>bluetooth-peripheral</string>
-		<string>external-accessory</string>
 	</array>
 
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Needed to connect to Meta AI glasses.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Needed to connect to Meta AI glasses.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Lets your phone find and connect to your Meta glasses over Wi-Fi to see through their camera.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_bonjour._tcp</string>
+	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Hear voice commands like 'scan this' and 'add it'.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

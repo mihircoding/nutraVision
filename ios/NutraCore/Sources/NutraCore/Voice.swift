@@ -55,6 +55,7 @@ public enum SpokenText {
     public static let nothingPending = "Nothing to add. Say scan this first."
     public static let skipped = "Skipped."
     public static let glassesDisconnected = "Glasses disconnected."
+    public static let glassesCameraStopped = "The glasses camera stopped. Check your phone."
 
     private static func n(_ x: Double) -> Int { Int(x.rounded()) }
 

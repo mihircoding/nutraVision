@@ -60,7 +60,7 @@ final class VoiceLoop: NSObject, AVSpeechSynthesizerDelegate {
         error = nil
         reply = ""
         source.onBarcode = { [weak self] code in self?.barcodeSeen(code) }
-        (source as? GlassesSession)?.onDisconnect = { [weak self] in self?.disconnected() }
+        (source as? GlassesSession)?.onDisconnect = { [weak self] reason in self?.disconnected(reason) }
         speech.onPartial = { [weak self] text in self?.transcript = text }
 
         let allowed = await SpeechRecognizer.requestAuthorization()
@@ -130,9 +130,11 @@ final class VoiceLoop: NSObject, AVSpeechSynthesizerDelegate {
         work = Task { await lookUp(code) }
     }
 
-    private func disconnected() {
+    /// `reason` is the SDK's explanation when it gave one: the glasses may still be connected (e.g. no Wi-Fi to them).
+    private func disconnected(_ reason: String?) {
         guard isRunning else { return }
-        halt(saying: SpokenText.glassesDisconnected)  // `reply` shows it
+        if let reason { error = "The glasses camera stopped: \(reason)" }
+        halt(saying: reason == nil ? SpokenText.glassesDisconnected : SpokenText.glassesCameraStopped)  // `reply` shows it
     }
 
     /// Stops the camera and listening but lets `text` play out; the screen keeps showing the error.

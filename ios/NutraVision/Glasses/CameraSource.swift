@@ -25,7 +25,7 @@ enum CameraSourceError: LocalizedError, Equatable {
     /// Approved, but Meta AI can't reach the glasses (in the case, folded, off, or out of range).
     case glassesNotConnected
     case glassesCameraDenied
-    /// The glasses were reached but their camera session didn't start; carries the SDK's reason.
+    /// The glasses were reached but their camera session didn't start; carries the reason and what to do.
     case glassesSessionFailed(String)
     case phoneCameraDenied
     case phoneCameraUnavailable
@@ -39,7 +39,7 @@ enum CameraSourceError: LocalizedError, Equatable {
         case .glassesCameraDenied:
             return "The glasses camera isn't allowed for NutraVision yet. Tap Glasses setup to allow it in Meta AI."
         case .glassesSessionFailed(let reason):
-            return "Couldn't start the glasses camera (\(reason)). Close other apps using your glasses, then try again."
+            return "Couldn't start the glasses camera: \(reason)"
         case .phoneCameraDenied: return "Camera access is off — allow it for NutraVision in Settings."
         case .phoneCameraUnavailable: return "No camera is available on this device."
         }

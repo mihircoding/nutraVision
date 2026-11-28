@@ -134,6 +134,11 @@ Priority: **P1** = likely to break or would lose data · **P2** = annoying · **
   **Expect:** the 4-step Glasses setup screen, not a "not connected" error. Follow it: Developer Mode in Meta AI
   (Settings › App Info, tap App version 5 times) > **Open Meta AI to approve** > approve > you're back with step 3
   ticked > **Allow camera in Meta AI** > Allow always > step 4 ticked > **Start Glasses Mode**.
+- [ ] **G1a (P1) First camera start.** After G1, the first Glasses Mode start. **Expect:** iOS asks to find devices
+  on your Local Network (tap **Allow**) and to join the glasses' Wi-Fi network (tap **Join**); then the live view
+  appears. Deny Local Network instead. **Expect:** "…couldn't join the glasses' Wi-Fi. Turn on Local Network…", not
+  "the glasses ended the session". *(Before this fix the app lacked the Bluetooth LE and Wi-Fi settings the glasses
+  need, and every start ended with "the glasses ended the session".)*
 - [ ] **G1b (P1) Clear errors.** With the glasses folded or in the case, start Glasses Mode. **Expect:** "Meta AI
   can't reach your glasses…", with **Glasses setup** and **Try again** buttons. It should never say "not connected"
   when the real problem is approval.
